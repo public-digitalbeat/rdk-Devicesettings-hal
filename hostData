@@ -1,0 +1,3 @@
+HDMI0.resolution        1080p
+HDMI0.AudioMode.AUTO	TRUE
+HDMI0.AudioMode	SURROUND
