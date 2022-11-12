@@ -7,9 +7,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
-#include "Amvideoutils.h"
-#include "Amsysfsutils.h"
-
+#include "dsSysfsUtils.h"
 #define SUCCESS 0
 #define SIZE 9
 #define File_Size 50

@@ -4,7 +4,7 @@ CXXFLAGS    = -std=c++1y  -g -fPIC -D_REENTRANT -Wall
 LIBNAME     := ds-hal
 LIBNAMEFULL := lib$(LIBNAME).so
 OBJS        := $(patsubst %.c,%.o,$(wildcard *.c))
-LD_LIBS     := -lpthread -lamavutils -ldrm -ludev -ltinyalsa -laudio_client -lvolume-ctl-clnt  
+LD_LIBS     := -lpthread -ldrm -ludev -ltinyalsa -laudio_client -lvolume-ctl-clnt
 library: $(OBJS)
 	@echo "Building $(LIBNAMEFULL) ...."
 	$(CXX) $(OBJS) $(CXXFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LD_LIBS) -shared -Wl,-soname,lib$(LIBNAME).so -o $(LIBNAMEFULL)

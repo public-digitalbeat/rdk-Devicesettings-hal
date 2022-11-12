@@ -17,14 +17,6 @@ namespace {
 /* List all supported resolutions here */
 
 static dsVideoPortResolution_t kResolutions[] = {
-		{   /*480i*/
-			/*.name = */					"480i",
-			/*.pixelResolution = */			dsVIDEO_PIXELRES_720x480,
-			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_4x3,
-			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
-			/*.frameRate = */				dsVIDEO_FRAMERATE_29dot97,
-			/*.interlaced = */				_INTERLACED,
-		},
 		{   /*480p*/
 			/*.name = */					"480p",
 			/*.pixelResolution = */			dsVIDEO_PIXELRES_720x480,
@@ -33,7 +25,7 @@ static dsVideoPortResolution_t kResolutions[] = {
 			/*.frameRate = */				dsVIDEO_FRAMERATE_59dot94,
 			/*.interlaced = */				_PROGRESSIVE,
 		},
-		{   /*576p*/
+		{   /*576p50*/
 			/*.name = */					"576p50",
 			/*.pixelResolution = */			dsVIDEO_PIXELRES_720x576,
 			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_4x3,
@@ -41,20 +33,44 @@ static dsVideoPortResolution_t kResolutions[] = {
 			/*.frameRate = */				dsVIDEO_FRAMERATE_50,
 			/*.interlaced = */				_PROGRESSIVE,
 		},
-		{   /*720p - Default - AutoSelect */
-			/*.name = */					"720p",
+		{   /*720p24*/
+			/*.name = */					"720p24",
 			/*.pixelResolution = */			dsVIDEO_PIXELRES_1280x720,
 			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
 			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
-			/*.frameRate = */				dsVIDEO_FRAMERATE_59dot94,
+			/*.frameRate = */				dsVIDEO_FRAMERATE_24,
 			/*.interlaced = */				_PROGRESSIVE,
 		},
-		{   /*720p - Default - AutoSelect */
+        {   /*720p25  */
+			/*.name = */					"720p25",
+			/*.pixelResolution = */			dsVIDEO_PIXELRES_1280x720,
+			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
+			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
+			/*.frameRate = */				dsVIDEO_FRAMERATE_25,
+			/*.interlaced = */				_PROGRESSIVE,
+		},
+        {   /*720p30  */
+			/*.name = */					"720p30",
+			/*.pixelResolution = */			dsVIDEO_PIXELRES_1280x720,
+			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
+			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
+			/*.frameRate = */				dsVIDEO_FRAMERATE_30,
+			/*.interlaced = */				_PROGRESSIVE,
+		},
+		{   /*720p50  */
 			/*.name = */					"720p50",
 			/*.pixelResolution = */			dsVIDEO_PIXELRES_1280x720,
 			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
 			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
 			/*.frameRate = */				dsVIDEO_FRAMERATE_50,
+			/*.interlaced = */				_PROGRESSIVE,
+		},
+		{   /*720p60 */
+			/*.name = */					"720p60",
+			/*.pixelResolution = */			dsVIDEO_PIXELRES_1280x720,
+			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
+			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
+			/*.frameRate = */				dsVIDEO_FRAMERATE_59dot94,
 			/*.interlaced = */				_PROGRESSIVE,
 		},
 		{   /*1080p24*/
@@ -65,48 +81,88 @@ static dsVideoPortResolution_t kResolutions[] = {
 			/*.frameRate = */				dsVIDEO_FRAMERATE_24,
 			/*.interlaced = */				_PROGRESSIVE,
 		},
-                {   /*1080p60hz*/
-                        /*.name = */                                    "1080p60",
-                        /*.pixelResolution = */                 dsVIDEO_PIXELRES_1920x1080,
-                        /*.aspectRatio = */                             dsVIDEO_ASPECT_RATIO_16x9,
-                        /*.stereoscopicMode = */                dsVIDEO_SSMODE_2D,
-                        /*.frameRate = */                               dsVIDEO_FRAMERATE_60,
-                        /*.interlaced = */                              _PROGRESSIVE,
-                },
-		{   /*1080p60*/
-			/*.name = */					"1080p",
+		{   /*1080p25*/
+			/*.name = */					"1080p25",
 			/*.pixelResolution = */			dsVIDEO_PIXELRES_1920x1080,
 			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
 			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
-			/*.frameRate = */				dsVIDEO_FRAMERATE_59dot94,
+			/*.frameRate = */				dsVIDEO_FRAMERATE_25,
 			/*.interlaced = */				_PROGRESSIVE,
 		},
-		{   /*1080i*/
-			/*.name = */					"1080i50hz",
+		{   /*1080p30*/
+			/*.name = */					"1080p30",
+			/*.pixelResolution = */			dsVIDEO_PIXELRES_1920x1080,
+			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
+			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
+			/*.frameRate = */				dsVIDEO_FRAMERATE_30,
+			/*.interlaced = */				_PROGRESSIVE,
+		},
+        {   /*1080p50*/
+            /*.name = */                    "1080p50",
+            /*.pixelResolution = */         dsVIDEO_PIXELRES_1920x1080,
+            /*.aspectRatio = */             dsVIDEO_ASPECT_RATIO_16x9,
+            /*.stereoscopicMode = */        dsVIDEO_SSMODE_2D,
+            /*.frameRate = */               dsVIDEO_FRAMERATE_50,
+            /*.interlaced = */              _PROGRESSIVE,
+        },
+        {   /*1080p60 - Default - AutoSelect */
+            /*.name = */					"1080p60",
+            /*.pixelResolution = */			dsVIDEO_PIXELRES_1920x1080,
+            /*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
+            /*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
+            /*.frameRate = */				dsVIDEO_FRAMERATE_60,
+            /*.interlaced = */				_PROGRESSIVE,
+        },
+		{   /*1080i50*/
+			/*.name = */					"1080i50",
 			/*.pixelResolution = */			dsVIDEO_PIXELRES_1920x1080,
 			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
 			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
 			/*.frameRate = */				dsVIDEO_FRAMERATE_50,
 			/*.interlaced = */				_INTERLACED,
 		},
-		{   /*1080p30*/
-			/*.name = */					"1080i60hz",
+		{   /*1080i60*/
+			/*.name = */					"1080i60",
 			/*.pixelResolution = */			dsVIDEO_PIXELRES_1920x1080,
 			/*.aspectRatio = */				dsVIDEO_ASPECT_RATIO_16x9,
 			/*.stereoscopicMode = */		dsVIDEO_SSMODE_2D,
-			/*.frameRate = */				dsVIDEO_FRAMERATE_59dot94,
+			/*.frameRate = */				dsVIDEO_FRAMERATE_60,
 			/*.interlaced = */				_INTERLACED,
 		},
+        {   /*2160p24*/
+            /*.name = */                            "2160p24",
+            /*.pixelResolution = */                 dsVIDEO_PIXELRES_3840x2160,
+            /*.aspectRatio = */                     dsVIDEO_ASPECT_RATIO_16x9,
+            /*.stereoscopicMode = */                dsVIDEO_SSMODE_2D,
+            /*.frameRate = */                       dsVIDEO_FRAMERATE_24,
+            /*.interlaced = */                      _PROGRESSIVE,
+        },
+        {   /*2160p25*/
+            /*.name = */                            "2160p25",
+            /*.pixelResolution = */                 dsVIDEO_PIXELRES_3840x2160,
+            /*.aspectRatio = */                     dsVIDEO_ASPECT_RATIO_16x9,
+            /*.stereoscopicMode = */                dsVIDEO_SSMODE_2D,
+            /*.frameRate = */                       dsVIDEO_FRAMERATE_25,
+            /*.interlaced = */                      _PROGRESSIVE,
+        },
         {   /*2160p30*/
-            /*.name = */                                    "2160p30",
+            /*.name = */                             "2160p30",
             /*.pixelResolution = */                 dsVIDEO_PIXELRES_3840x2160,
             /*.aspectRatio = */                     dsVIDEO_ASPECT_RATIO_16x9,
             /*.stereoscopicMode = */                dsVIDEO_SSMODE_2D,
             /*.frameRate = */                       dsVIDEO_FRAMERATE_30,
             /*.interlaced = */                      _PROGRESSIVE,
         },
+        {   /*2160p50*/
+            /*.name = */                            "2160p50",
+            /*.pixelResolution = */                 dsVIDEO_PIXELRES_3840x2160,
+            /*.aspectRatio = */                     dsVIDEO_ASPECT_RATIO_16x9,
+            /*.stereoscopicMode = */                dsVIDEO_SSMODE_2D,
+            /*.frameRate = */                       dsVIDEO_FRAMERATE_50,
+            /*.interlaced = */                      _PROGRESSIVE,
+        },
         {   /*2160p60*/
-            /*.name = */                                    "2160p60",
+            /*.name = */                            "2160p60",
             /*.pixelResolution = */                 dsVIDEO_PIXELRES_3840x2160,
             /*.aspectRatio = */                     dsVIDEO_ASPECT_RATIO_16x9,
             /*.stereoscopicMode = */                dsVIDEO_SSMODE_2D,
@@ -115,7 +171,7 @@ static dsVideoPortResolution_t kResolutions[] = {
         },
 };
 
-static const int kDefaultResIndex = 7; //Pick one resolution from kResolutions[] as default
+static const int kDefaultResIndex = 11; //Pick one resolution from kResolutions[] as default
 
 #ifdef __cplusplus
 }

@@ -7,8 +7,6 @@
 #include <sys/ioctl.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "Amvideoutils.h"
-#include "Amsysfsutils.h"
 
 
 #define dsVIDEOPORT_INDEX 0
@@ -56,6 +54,7 @@ static const char *dsVideoCodecsCmd = "lsmod | grep \"^amvdec_.*v4l\\b\" | "
 		"awk '{ print $1 }' | sed -e 's/amvdec_\\(.*\\)_v4l/\\1/'";
 
 static const char *dsGetHDRCapabilitiesCmd = "find /lib/modules/ -name *.ko | grep dovi.ko";
+
 
 /**
  * @brief Initialize video device module
@@ -318,5 +317,159 @@ dsError_t dsGetVideoCodecInfo (int handle, dsVideoCodingFormat_t codec, dsVideoC
 	}
 
 	return dsERR_NONE;
+}
+
+
+dsError_t westerosReadWrite(char *cmd, char *response)
+{
+    char buffer[256] = {0};
+    FILE *fd;
+
+    fd = popen(cmd , "r");
+
+    if (fd == NULL) {
+            fprintf(stderr, "Could not open pipe.\n");
+            return dsERR_INVALID_PARAM;
+    }
+
+    // Read process output
+    while (fgets(buffer, 256, fd) != NULL)
+    {
+            printf("%s", buffer);
+    }
+
+    strcpy(response, buffer);
+    pclose(fd);
+    return dsERR_NONE;
+}
+
+
+void removeChar(char *str, char garbage) {
+
+    char *src, *dst;
+    for (src = dst = str; *src != '\0'; src++) {
+        *dst = *src;
+        if (*dst != garbage) dst++;
+    }
+    *dst = '\0';
+}
+
+dsError_t dsSetFRFMode(int handle, int framerate)
+{
+    char *ptr =NULL;
+    char resp[256] = {0};
+    char buf[256] ={0};
+
+    printf(" %s :  framerate= %d \r\n",__FUNCTION__, framerate);
+#ifndef TMP_XDG_RUNTIME_DIR
+    sprintf(buf, "export XDG_RUNTIME_DIR=/run; westeros-gl-console set auto-frm-mode %d", framerate);
+#else
+    sprintf(buf, "export XDG_RUNTIME_DIR=/tmp; westeros-gl-console set auto-frm-mode %d", framerate);
+#endif
+
+    westerosReadWrite(buf, resp);
+
+    printf("%s\n", resp);
+    ptr = strstr(resp, "auto-frm-mode");
+    if (ptr != NULL) {
+        if (framerate == atoi(ptr+14)) {
+                return dsERR_NONE;
+        }
+    }
+    return dsERR_INVALID_PARAM;
+}
+
+dsError_t dsGetFRFMode(int handle, int *frfmode)
+{
+    char *ptr =NULL;
+    char resp[256] = {0};
+    char buf[256] ={0};
+
+    printf("%s :  \r\n",__FUNCTION__);
+#ifndef TMP_XDG_RUNTIME_DIR
+    memcpy(buf, "export XDG_RUNTIME_DIR=/run; westeros-gl-console get auto-frm-mode", 66);
+#else
+    memcpy(buf, "export XDG_RUNTIME_DIR=/tmp; westeros-gl-console get auto-frm-mode", 66);
+#endif
+
+    westerosReadWrite(buf, resp);
+
+    printf("%s\n", resp);
+    ptr = strstr(resp, "auto-frm-mode");
+    if (ptr == NULL) {
+        return dsERR_INVALID_PARAM;
+    }else{
+        *frfmode = atoi(ptr+13);
+    }
+    return dsERR_NONE;
+}
+
+dsError_t dsGetCurrentDisplayframerate(int handle, char *framerate)
+{
+    char *ptr =NULL;
+    char resp[256] = {0};
+    char buf[256] ={0};
+
+    printf("%s : \r\n",__FUNCTION__);
+#ifndef TMP_XDG_RUNTIME_DIR
+    memcpy(buf, "export XDG_RUNTIME_DIR=/run; westeros-gl-console get mode", 57);
+#else
+    memcpy(buf, "export XDG_RUNTIME_DIR=/tmp; westeros-gl-console get mode", 57);
+#endif
+
+    westerosReadWrite(buf, resp);
+
+    printf("%s\n", resp);
+
+    //removes character 'p' from response
+    removeChar(resp, 'p');
+
+    ptr = strstr(resp, "mode");
+
+    if (ptr == NULL) {
+        return dsERR_INVALID_PARAM;
+    }else{
+    // strncpy(framerate, ptr+5, 13);
+    strncpy(framerate, ptr+5, strlen(ptr) - 6);
+    }
+    return dsERR_NONE;
+}
+
+dsError_t dsSetDisplayframerate(int handle, char *mode)
+{
+    char *ptr =NULL;
+    char resp[256] = {0};
+    char buf[256] ={0};
+
+    char resolution[256] ={0};
+
+    // memcpy(resolution, mode, strlen(mode)+1);
+    //add char 'p' after second 'X'
+
+    ptr = strstr(mode,"x");
+    ptr++;
+    ptr = strstr(ptr,"x");
+
+    strncpy(resolution, mode, strlen(mode)-strlen(ptr));
+    strcat (resolution,"p");
+    strcat (resolution,ptr);
+
+    printf("%s :  mode= %s \r\n",__FUNCTION__, resolution);
+
+#ifndef TMP_XDG_RUNTIME_DIR
+    sprintf(buf, "export XDG_RUNTIME_DIR=/run; westeros-gl-console set mode %s", resolution);
+#else
+    sprintf(buf, "export XDG_RUNTIME_DIR=/tmp; westeros-gl-console set mode %s", resolution);
+#endif
+
+    westerosReadWrite(buf, resp);
+
+    printf("%s\n", resp);
+
+    ptr = strstr(resp, mode);
+    if (ptr != NULL) {
+            return dsERR_NONE;
+    }
+    return dsERR_INVALID_PARAM;
 }
 

@@ -268,20 +268,44 @@ int getCurrentDRMResolution (int drmFD, drmModeRes *res, drmModeConnector *conn,
             else if(!strcmp(crtc->mode.name,"720x480") || !strcmp(crtc->mode.name,"480p60hz")) {
                 *drmResolution = drmMode_480p;
             }
-            else if(!strcmp(crtc->mode.name,"1280x720") || strstr(crtc->mode.name,"720p")) {
+            else if(!strcmp(crtc->mode.name,"720x576p50")|| !strcmp(crtc->mode.name,"720x576p") || !strcmp(crtc->mode.name,"576p50hz") ) {
+                *drmResolution = drmMode_576p;
+            }
+            else if(!strcmp(crtc->mode.name,"1280x720p24") || strstr(crtc->mode.name,"720p24")) {
+                *drmResolution = drmMode_720p24;
+            }
+            else if(!strcmp(crtc->mode.name,"1280x720p25") || strstr(crtc->mode.name,"720p25")) {
+                *drmResolution = drmMode_720p25;
+            }
+            else if(!strcmp(crtc->mode.name,"1280x720p30") || strstr(crtc->mode.name,"720p30")) {
+                *drmResolution = drmMode_720p30;
+            }
+            else if(!strcmp(crtc->mode.name,"1280x720p50") || strstr(crtc->mode.name,"720p50")) {
+                *drmResolution = drmMode_720p50;
+            }
+            else if(!strcmp(crtc->mode.name,"1280x720p60") || strstr(crtc->mode.name,"720p60") || strstr(crtc->mode.name,"720p")) {
                 *drmResolution = drmMode_720p;
             }
-            else if(!strcmp(crtc->mode.name,"1920x1080i") || strstr(crtc->mode.name,"1080i")) {
+            else if(!strcmp(crtc->mode.name,"1920x1080i50") || strstr(crtc->mode.name,"1080i50")) {
+                *drmResolution = drmMode_1080i50;
+            }
+            else if(!strcmp(crtc->mode.name,"1920x1080i60") || strstr(crtc->mode.name,"1080i60") || strstr(crtc->mode.name,"1080i")) {
                 *drmResolution = drmMode_1080i;
             }
-            else if(!strcmp(crtc->mode.name,"1920x1080") || strstr(crtc->mode.name,"1080p")) {
-                if(crtc->mode.vrefresh == 60) {
-                    *drmResolution = drmMode_1080p;
-                }
-                else {
-                    printf(" DSDRM: (%s) line %d Couldn't recognize resolution %s\n",__func__, __LINE__, crtc->mode.name);
-                    ret = 0;
-                }
+            else if(!strcmp(crtc->mode.name,"1920x1080p24") || strstr(crtc->mode.name,"1080p24")) {
+                *drmResolution = drmMode_1080p24;
+            }
+            else if(!strcmp(crtc->mode.name,"1920x1080p25") || strstr(crtc->mode.name,"1080p25")) {
+                *drmResolution = drmMode_1080p25;
+            }
+            else if(!strcmp(crtc->mode.name,"1920x1080p30") || strstr(crtc->mode.name,"1080p30")) {
+                *drmResolution = drmMode_1080p30;
+            }
+            else if(!strcmp(crtc->mode.name,"1920x1080p50") || strstr(crtc->mode.name,"1080p50")) {
+                *drmResolution = drmMode_1080p50;
+            }
+            else if(!strcmp(crtc->mode.name,"1920x1080p60") || strstr(crtc->mode.name,"1080p60") || strstr(crtc->mode.name,"1080p")) {
+                *drmResolution = drmMode_1080p;
             }
             else if(!strcmp(crtc->mode.name,"3840x2160") || strstr(crtc->mode.name,"2160p")) {
                 if(crtc->mode.vrefresh == 24) {
@@ -352,7 +376,7 @@ drmConnectorModes getDRMConnectorModeInfo(dsVideoResolution_t pixelRes, dsVideoF
             break;
 
         case dsVIDEO_PIXELRES_720x576:
-            drmMode = drmMode_Unknown;
+            drmMode = drmMode_576p;
             break;
 
         case dsVIDEO_PIXELRES_1280x720:

@@ -18,7 +18,6 @@
 #include "audio_if.h"
 
 #include <tinyalsa/asoundlib.h>
-#include "Amsysfsutils.h"
 #include "dsSysfsUtils.h"
 #include "volume-ctl-clnt.h"
 
@@ -133,7 +132,10 @@ static devsysfs_file_map_t sys_files[DEV_SYS_FILES] = { \
     "-drc 0 -bs 100 -cs 100"
 #define DRC_RF \
     "-drc 1 -bs 0 -cs 0"
-
+#define MS12_ATMOS_LOCK_ON \
+    "-atmos_lock 1"
+#define MS12_ATMOS_LOCK_OFF \
+    "-atmos_lock 0"
 
 static bool audioCompressionEnabled = false;
 static int  audioCompressionLevel = 0;
@@ -2373,6 +2375,33 @@ dsError_t dsIsAudioMSDecode (int handle, bool *HasMS11Decode)
 	return ret;
 }
 
+dsError_t dsIsAudioMS12Decode (int handle, bool *HasMS12Decode)
+{
+	printf("Inside %s :%d\n",__FUNCTION__,__LINE__);
+	dsError_t ret = dsERR_NONE;
+
+	if ( ! isValidAopHandle(handle) || NULL == HasMS12Decode ) {
+				ret = dsERR_INVALID_PARAM;
+		}
+
+	if ( dsERR_NONE == ret ) {
+		*HasMS12Decode = false;
+		APortHandle_t *aPHandle = (APortHandle_t*)handle;
+		VALIDATE_TYPE_AND_INDEX ( aPHandle->m_aType, aPHandle->m_index );
+
+		switch (aPHandle->m_aType) {
+			case dsAUDIOPORT_TYPE_HDMI:
+			case dsAUDIOPORT_TYPE_SPDIF:
+			case dsAUDIOPORT_TYPE_SPEAKER:
+				*HasMS12Decode = is_dolby_ms_enabled ( aPHandle->m_aType, aPHandle->m_index);
+				break;
+			default:
+				break;
+		}
+	}
+	return ret;
+}
+
 static dsError_t deInitHDMI(APortHandle_t* hports) {
     uint8_t index;
     APortHandle_t*  hport   = NULL;
@@ -2671,11 +2700,79 @@ dsError_t dsGetAudioDelay(int handle, uint32_t *audioDelayMs){
 }
 
 dsError_t dsGetAudioDelayOffset(int handle, uint32_t *audioDelayOffsetMs){
-    return dsERR_NONE;
+    dsError_t ret = dsERR_NONE;
+    printf("Inside %s :%d\n",__FUNCTION__,__LINE__);
+
+    if (!isValidAopHandle(handle) || audioDelayOffsetMs == NULL) {
+        ret = dsERR_INVALID_PARAM;
+    }
+
+    if (dsERR_NONE == ret) {
+        *audioDelayOffsetMs = audioDelay;
+    }
+
+    return ret;
 }
 
 dsError_t dsSetAudioDelayOffset(int handle, const uint32_t audioDelayOffsetMs){
-    return dsERR_NONE;
+    printf("Inside %s :%d, audioDelayOffsetMs : %d\n",__FUNCTION__,__LINE__, audioDelayOffsetMs);
+    dsError_t ret = dsERR_NONE;
+    audio_hw_device_t *device;
+    int err = 0;
+    char cmd[256];
+    APortHandle_t *aPHandle = (APortHandle_t*)handle;
+
+    if (!isValidAopHandle(handle)) {
+        ret = dsERR_INVALID_PARAM;
+    }
+
+    err = audio_hw_load_interface(&device);
+    if (err) {
+        fprintf(stderr, "audio_hw_load_interface failed: %d\n", ret);
+        return dsERR_GENERAL;
+    }
+
+    err = device->init_check(device);
+    if (err) {
+        printf("device not inited, quit\n");
+        audio_hw_unload_interface(device);
+        return dsERR_GENERAL;
+    }
+
+    if (dsERR_NONE == ret) {
+        VALIDATE_TYPE_AND_INDEX ( aPHandle->m_aType, aPHandle->m_index );
+        switch (aPHandle->m_aType) {
+            case dsAUDIOPORT_TYPE_SPDIF:
+                snprintf(cmd, sizeof(cmd), "%s%d", SPDIF_DELAY_CMD, audioDelayOffsetMs);
+                err = device->set_parameters(device, cmd);
+                if (err) {
+                    fprintf(stderr, "set spdif delay failed, err %d\n", err);
+                    ret = dsERR_GENERAL;
+                }
+                break;
+
+            case dsAUDIOPORT_TYPE_SPEAKER:
+                snprintf(cmd, sizeof(cmd), "%s%d", SPEAKER_DELAY_CMD, audioDelayOffsetMs);
+                err = device->set_parameters(device, cmd);
+                if (err) {
+                    fprintf(stderr, "set spdif delay failed, err %d\n", err);
+                    ret = dsERR_GENERAL;
+                }
+                break;
+
+            case dsAUDIOPORT_TYPE_HDMI:
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (ret == dsERR_NONE) {
+        audioDelay = audioDelayOffsetMs;
+        fprintf(stderr, "set audio delay %d ms on port %d successfully\n", audioDelay, aPHandle->m_aType);
+    }
+    audio_hw_unload_interface(device);
+    return ret;
 }
 
 dsError_t  dsGetIntelligentEqualizerMode(int handle, int *mode){
@@ -2909,6 +3006,64 @@ dsError_t dsGetAudioCapabilities(int handle, int *capabilities)
         *capabilities = dsAUDIOSUPPORT_NONE;
 
         ret = dsERR_OPERATION_NOT_SUPPORTED;
+    }
+
+    return ret;
+}
+
+
+/**
+ * @brief Set the audio ATMOS outout mode
+ *
+ * This function will set the Audio Atmos output mode
+ *
+ * @param [in] handle        Handle for the Output Audio port
+ * @param [in] enable set audio ATMOS output mode
+ * @return dsError_t Error code.
+ */
+dsError_t dsSetAudioAtmosOutputMode(int handle, bool enable)
+{
+    dsError_t ret = dsERR_NONE;
+    printf("Inside %s :%d\n",__FUNCTION__,__LINE__);
+
+    if ( ! isValidAopHandle(handle)) {
+        return dsERR_INVALID_PARAM;
+    }
+
+    audio_hw_device_t *device;
+    int err = audio_hw_load_interface(&device);
+    if (err) {
+        printf("DS_HAL : %s: audio_hw_load_interface failed: %d\n", __func__, err);
+        device = NULL;
+        return dsERR_GENERAL;
+    }
+
+    err = device->init_check(device);
+
+    if (err) {
+        printf("DS_HAL: %s :device not inited, quit\n", __func__);
+        audio_hw_unload_interface(device);
+        device = NULL;
+        return dsERR_GENERAL;
+    }
+
+    if (enable) {
+        err = device->set_parameters(device,
+            MS12_RUNTIME_CMD
+            MS12_ATMOS_LOCK_ON);
+    }
+    else {
+        err = device->set_parameters(device,
+            MS12_RUNTIME_CMD
+            MS12_ATMOS_LOCK_OFF);
+    }
+
+    if (err) {
+        printf("%s: Dolby MS12 parameter set failed: %d\n", __FUNCTION__, ret);
+        ret = dsERR_GENERAL;
+    }
+    else {
+        printf("%s: Dolby MS12 parameter set : %d\n", __FUNCTION__, enable);
     }
 
     return ret;

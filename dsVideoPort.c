@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <libdrm_meson/meson_drm_display.h>
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
@@ -54,6 +55,7 @@ bool drmInitialized = false;
 //static drmModeConnector *hdmiConn = NULL; //DRM HDMI connector ptr
 static uint32_t connector_id = 0;
 bool drmRefreshAlive = false;
+static dsHdcpProtocolVersion_t hdcp_version = dsHDCP_VERSION_2X;
 
 static pthread_mutex_t initLock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t initCond = PTHREAD_COND_INITIALIZER;
@@ -257,6 +259,7 @@ static bool getDvSupportStatus() {
 /***
   * @Info   : This funtion will enable DolbyVision core.
   */
+#if 0
 int enableDolbyVisionCore(void)
 {
     /* For current policy, we always use dv as first priority, so
@@ -331,6 +334,23 @@ err:
 
     return ret == 0 ? 1 : 0;
 }
+#else
+int enableDolbyVisionCore(void){
+    uint32_t retValue = 0x55;
+    bool bDvValid = getDvSupportStatus();
+    int value = bDvValid ? 1 : 0;
+
+    if (value) {
+        meson_drm_set_prop(ENUM_DRM_PROP_HDMI_DV_ENABLE, value);
+        meson_drm_get_prop(ENUM_DRM_PROP_HDMI_DV_ENABLE, &retValue);
+    }else{
+        retValue = value;
+    }
+
+    fprintf(stderr, "DSHAL: retValue %d, value %d\n", retValue, value);
+    return retValue == value ? 1 : 0;
+}
+#endif
 
 drmModeConnector * dsDRMGetHDMIConnector(void)
 {
@@ -402,10 +422,10 @@ static void * process_hdcp_dolbyVisonEnable(void * arg){
     if(hdcpRet == dsERR_NONE) {
         bool connected = false;
         hdcpRet = dsIsDisplayConnected(hdcpHandle, &connected);
-        if((hdcpRet==dsERR_NONE)&&connected) {
+        if (hdcpRet==dsERR_NONE) {
            int cnt = 0;
            while(1) {
-               if (hdcpNotified == 0) {
+               if ((hdcpNotified == 0) && connected) {
                    hdcpRet = dsGetHDCPStatus(hdcpHandle, &hdcpStatus);
                    if((hdcpRet==dsERR_NONE)&&(hdcpStatus==dsHDCP_STATUS_AUTHENTICATED)) {
                        if(hdcpStatusCallback && hdcpHandle && isValidVopHandle(hdcpHandle)) {
@@ -681,6 +701,8 @@ dsError_t  dsEnableVideoPort(int handle, bool enabled)
             char output[64] = {'\0'};
             while (fgets(output, sizeof(output)-1, fp)) {
                 if (strlen(output) && strnstr(output, "[0:", 20)) {
+                    //set IsEnabled flag if command was executed successfully
+                    vopHandle->IsEnabled = enabled;
                     ret = dsERR_NONE;
                 } else {
                     ret = dsERR_GENERAL;
@@ -842,11 +864,41 @@ dsError_t dsGetResolution(int handle, dsVideoPortResolution_t *resolution)
                 case drmMode_480p :
                     resName = "480p";
                     break;
+                case drmMode_576p :
+                    resName = "576p50";
+                    break;
+                case drmMode_720p24 :
+                    resName = "720p24";
+                    break;
+                case drmMode_720p25 :
+                    resName = "720p25";
+                    break;
+                case drmMode_720p30 :
+                    resName = "720p30";
+                    break;
+                case drmMode_720p50 :
+                    resName = "720p50";
+                    break;
                 case drmMode_720p :
-                    resName = "720p";
+                    resName = "720p60";
                     break;
                 case drmMode_1080i :
-                    resName = "1080i";
+                    resName = "1080i60";
+                    break;
+                case drmMode_1080i50 :
+                    resName = "1080i50";
+                    break;
+                case drmMode_1080p24 :
+                    resName = "1080p24";
+                    break;
+                case drmMode_1080p25 :
+                    resName = "1080p25";
+                    break;
+                case drmMode_1080p30 :
+                    resName = "1080p30";
+                    break;
+                case drmMode_1080p50 :
+                    resName = "1080p50";
                     break;
                 case drmMode_1080p :
                     resName = "1080p60";
@@ -910,14 +962,104 @@ out:
 dsError_t  dsSetResolution(int handle, dsVideoPortResolution_t *resolution, bool persist)
 {
     dsError_t ret = dsERR_NONE;
+    int ResolutionCnt = sizeof(kResolutions)/sizeof(dsVideoPortResolution_t);
+    int i=0;
     printf(" DS_HAL: dsSetResolution %s, To Persist: %d\n",resolution->name, persist);
 #ifdef AML_STB
+
     if (!resolution) {
         ret = dsERR_INVALID_PARAM;
-    } else {
+        return ret;
+    }
+
+    for (i = 0; i < ResolutionCnt; i++) {
+        if ((kResolutions[i].pixelResolution == resolution->pixelResolution) &&
+            (kResolutions[i].interlaced == resolution->interlaced) &&
+            (kResolutions[i].aspectRatio == resolution->aspectRatio) &&
+            (kResolutions[i].stereoScopicMode == resolution->stereoScopicMode))
+            {
+                break;
+            }
+    }
+    if (i == ResolutionCnt)
+    {
+        return dsERR_INVALID_PARAM;
+    }
+    else {
         char cmdBuf[512] = {'\0'};
-        snprintf(cmdBuf, sizeof(cmdBuf)-1, "export XDG_RUNTIME_DIR=%s;westeros-gl-console set mode %s | grep \"Response\"",
-                XDG_RUNTIME_DIR, resolution->name);
+        int width = -1, height = -1;
+        int rate = 60;
+        char interlaced = 'n';
+
+        if (sscanf (resolution->name, "%dx%dp%d", &width, &height, &rate) == 3)
+        {
+            interlaced = 'p';
+        }
+        else if (sscanf(resolution->name, "%dx%di%d", &width, &height, &rate ) == 3)
+        {
+            interlaced = 'i';
+        }
+        else if (sscanf(resolution->name, "%dx%dx%d", &width, &height, &rate ) == 3)
+        {
+            interlaced = 'p';
+        }
+        else if (sscanf(resolution->name, "%dx%d", &width, &height ) == 2)
+        {
+            interlaced = 'p';
+        }
+        else if (sscanf(resolution->name, "%dp%d", &height, &rate ) == 2)
+        {
+            interlaced = 'p';
+            width= -1;
+        }
+        else if (sscanf(resolution->name, "%di%d", &height, &rate ) == 2)
+        {
+            interlaced = 'i';
+            width= -1;
+        }
+        else if (sscanf(resolution->name, "%d%c", &height, &interlaced ) == 2)
+        {
+           width= -1;
+           rate = 60;
+        }
+
+        //if width is missing, set it manualy
+        if ( height > 0 )
+        {
+           if ( width < 0 )
+           {
+              switch ( height )
+              {
+                 case 480:
+                 case 576:
+                    width= 720;
+                    break;
+                 case 720:
+                    width= 1280;
+                    break;
+                 case 1080:
+                    width= 1920;
+                    break;
+                 case 1440:
+                    width= 2560;
+                    break;
+                 case 2160:
+                    width= 3840;
+                    break;
+                 case 2880:
+                    width= 5120;
+                    break;
+                 case 4320:
+                    width= 7680;
+                    break;
+                 default:
+                    break;
+              }
+           }
+        }
+
+        snprintf(cmdBuf, sizeof(cmdBuf)-1, "export XDG_RUNTIME_DIR=%s;westeros-gl-console set mode %dx%d%c%d | grep \"Response\"",
+                XDG_RUNTIME_DIR, width,height,interlaced,rate);
         DBG("AML_STB Executing '%s'\n", cmdBuf);
         /* FIXME: popen in use */
         FILE* fp = popen(cmdBuf, "r");
@@ -936,6 +1078,55 @@ dsError_t  dsSetResolution(int handle, dsVideoPortResolution_t *resolution, bool
             ret = dsERR_GENERAL;
         }
     }
+#endif
+    return ret;
+}
+
+dsError_t dsSetBackgroundColor(int handle, dsVideoBackgroundColor_t color)
+{
+    dsError_t ret = dsERR_NONE;
+    printf("DS_HAL: dsSetBackgroundColor %d\n",color);
+#ifdef AML_STB
+    if (!isValidVopHandle(handle)) {
+        fprintf(stderr, "dsSetBackgroundColor invalid handle 0x%x\n", handle);
+        return dsERR_INVALID_PARAM;
+    }
+    char cmdBuf[512] = {'\0'};
+    if (color == dsVIDEO_BGCOLOR_BLUE)
+    {
+        snprintf(cmdBuf, sizeof(cmdBuf)-1, "export XDG_RUNTIME_DIR=%s;westeros-gl-console set video-backcolor blue | grep \"Response\"",
+            XDG_RUNTIME_DIR);
+        printf("DS_HAL: dsSetBackgroundColor blue: %d\n",color);
+    }
+    else if ((color == dsVIDEO_BGCOLOR_BLACK) || (color == dsVIDEO_BGCOLOR_NONE))
+    {
+        snprintf(cmdBuf, sizeof(cmdBuf)-1, "export XDG_RUNTIME_DIR=%s;westeros-gl-console set video-backcolor black | grep \"Response\"",
+            XDG_RUNTIME_DIR);
+        printf("DS_HAL: dsSetBackgroundColor black: %d\n",color);
+    }
+    else
+    {
+        printf("DS_HAL: dsSetBackgroundColor invalid \n");
+        return dsERR_INVALID_PARAM;
+    }
+    DBG("AML_STB Executing '%s'\n", cmdBuf);
+    /* FIXME: popen in use */
+    FILE* fp = popen(cmdBuf, "r");
+    if (NULL != fp) {
+        char output[64] = {'\0'};
+        while (fgets(output, sizeof(output)-1, fp)) {
+            if (strlen(output) && strnstr(output, "[0:", 20)) {
+                ret = dsERR_NONE;
+            } else {
+                ret = dsERR_GENERAL;
+            }
+        }
+        pclose(fp);
+    } else {
+        printf("DS_HAL: popen failed\n");
+        ret = dsERR_GENERAL;
+    }
+
 #endif
     return ret;
 }
@@ -1020,7 +1211,7 @@ dsError_t dsGetHDCPReceiverProtocol (int handle, dsHdcpProtocolVersion_t *protoc
         /* dsHDCP_VERSION_1X is mandatory. */
         *protocolVersion = dsHDCP_VERSION_1X;
 
-        amsysfs_get_sysfs_str(SYSFS_HDMITX_HDCPMODE, buffer, sizeof(buffer)-1);
+        amsysfs_get_sysfs_str(SYSFS_HDMITX_HDCPVERSION, buffer, sizeof(buffer)-1);
         printf("dsGetHDCPReceiverProtocol: buffer : '%s'\n", buffer);
         if (strnstr(buffer, "22", sizeof(buffer))) {
             *protocolVersion = dsHDCP_VERSION_2X;
@@ -1055,7 +1246,7 @@ dsError_t dsGetHDCPCurrentProtocol (int handle, dsHdcpProtocolVersion_t *protoco
         /* dsHDCP_VERSION_1X is mandatory. */
         *protocolVersion = dsHDCP_VERSION_1X;
 
-        amsysfs_get_sysfs_str(SYSFS_HDMITX_HDCPMODE, buffer, sizeof(buffer)-1);
+        amsysfs_get_sysfs_str(SYSFS_HDMITX_HDCPVERSION, buffer, sizeof(buffer)-1);
         DBG("buffer : '%s'\n", buffer);
         if (strnstr(buffer, "22", sizeof(buffer)) && !strnstr(buffer, "fail", sizeof(buffer))) {
             *protocolVersion = dsHDCP_VERSION_2X;
@@ -1341,21 +1532,39 @@ dsError_t dsSetHdmiPreference(int handle, dsHdcpProtocolVersion_t *hdcpCurrentPr
 {
     dsError_t ret = dsERR_NONE;
     /* FIXME: identify possiblility of setting preffered HDMI mode. */
+    if (!isValidVopHandle(handle)) {
+        return dsERR_INVALID_PARAM;
+    }
     if (!hdcpCurrentProtocol) {
         ret = dsERR_INVALID_PARAM;
     }
+
+    if ((*hdcpCurrentProtocol == dsHDCP_VERSION_1X) || (*hdcpCurrentProtocol == dsHDCP_VERSION_2X))
+    {
+        hdcp_version = *hdcpCurrentProtocol;
+        ret = dsERR_NONE;
+    }
+    else
+    {
+        ret = dsERR_OPERATION_NOT_SUPPORTED;
+    }
+
     return ret;
 }
 
 dsError_t dsGetHdmiPreference(int handle, dsHdcpProtocolVersion_t *hdcpCurrentProtocol)
 {
     dsError_t ret = dsERR_NONE;
+    if (!isValidVopHandle(handle)) {
+        return dsERR_INVALID_PARAM;
+    }
+
     if (!hdcpCurrentProtocol) {
         ret = dsERR_INVALID_PARAM;
     } else {
         /* FIXME: identify possiblility of getting preffered HDMI mode.
            Assuming STB always go for 2.2 */
-        *hdcpCurrentProtocol = dsHDCP_VERSION_2X;
+        *hdcpCurrentProtocol = hdcp_version;
     }
     return ret;
 }
@@ -1643,4 +1852,34 @@ dsError_t dsIsDisplaySurround(int handle, bool *surround)
     }
 #endif
     return ret;
+}
+
+/**
+ * @brief Get current video Electro-Optical Transfer Function (EOT) value;
+ *
+ * @param[in]  handle -  Handle of the display device.
+ * @param[out] video_eotf - pointer to EOFF value
+ *
+ * @return Device Settings error code
+ * @retval dsERR_NONE on success
+ * @retval dsERR_GENERAL General failure.
+ */
+dsError_t dsGetVideoEOTF(int handle, dsHDRStandard_t *video_eotf)
+{
+    printf("Inside %s :%d\n",__FUNCTION__,__LINE__);
+    VOPHandle_t *vopHandle = (VOPHandle_t *) handle;
+
+    if (!isValidVopHandle(handle)) {
+        return dsERR_INVALID_PARAM;
+    }
+
+    if (video_eotf == NULL) {
+       return dsERR_INVALID_PARAM;
+    }
+
+    *video_eotf = (dsHDRStandard_t)(dsHDRSTANDARD_NONE|dsHDRSTANDARD_HLG|dsHDRSTANDARD_HDR10|dsHDRSTANDARD_DolbyVision);
+
+    printf("*video_eotf = %d\n",*video_eotf);
+
+    return dsERR_NONE;
 }
